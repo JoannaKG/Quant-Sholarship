@@ -190,21 +190,3 @@ module Expressions =
 
 // Excercise 6. There is a bug in the parser above. "5+7foobar" is valid expression. Write parser endInput : Parser<_> which success on empty input. Create safeExpression which combines 
 // expression and endInput so that "5+7foobar" is no longer valid input.
-
-
-let inverse d = // float -> float option
-    match d with
-    | 0.-> None
-    | _ -> Some (1./d)
-let doubleDouble x = x *2.0 // : float -> float
-let x = Some 2.
-let doubleX = Option.map doubleDouble x
-let inverseX = Option.bind inverse x
-let inverseY = inverse x   
-
-let addOne x = x + 1
-let timesTwo x = 2 * x
-
-// Composition operator
-// ( >> ) : ('T1 -> 'T2) -> ('T2 -> 'T3) -> 'T1 -> 'T3
-let Compose2 = addOne >> timesTwo
