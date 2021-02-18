@@ -101,24 +101,43 @@ module Combinators =
     //    val it : (char * seq<char>) option = None
 
     //    b. Try to rewrite combineR using Option.bind. Hint: Did you use >> ? .
-    let combineR_bind (p1: Parser<'t1>) (p2: Parser<'t2>) =
-    //TODO
+    let combineRBind (p1: Parser<'t1>) (p2: Parser<'t2>) =
+    //I don't understand how it works:
+        p1 >> Option.bind (snd >> p2)
+    //    let result: Parser<char> = combineRBind (Parsers.pChar 'a') (Parsers.pChar 'b');;
+    //    result "abc";;
+
     //    c. Define 'combine p1 p2' that produce tuple of result from both parsers
-    let combine (p1: Parser<'t1>) (p2: Parser<'t2>) (input: seq<char>) =
+    let combine p1 p2 input =
         match p1 input with  //run the first parser ..
         | Some (result, restOfInput) -> // ... and check the result
             match p2 restOfInput with // if successed run the second parser
-            | Some (result2, restOfInput2) -> (Some (result, restOfInput), Some (result2, restOfInput2)) 
-            | None -> (Some (result, restOfInput),None)
-        | _ -> (None,None) 
+            | Some (result2, _) -> Some((result, result2), restOfInput) 
+            | None -> None
+        | _ -> None 
+//    let result = Combinators.combine (Parsers.pChar 'a') (Parsers.pChar 'b') "abcd";;
 
-//    > let result = combine (Parsers.pChar 'a') (Parsers.pChar 'b') "abc";;
-
-//    e. Is it possible to rewrite comblineL and combine the same way combineR was in part b.?
+//    d. Is it possible to rewrite comblineL and combine the same way combineR was in part b.?
+      //I don't understand how it works:
+    let combineLBind (p1: Parser<'t1>) (p2: Parser<'t2>) =
+        let runP (result, input) = p2 input |> Option.map(fun (_, restOfInput) -> (result, restOfInput))
+        p1 >> Option.bind runP
+    let combineBind (p1: Parser<'t1>) (p2: Parser<'t2>) =
+        let runP (result, input) = p2 input |> Option.map(fun (result2, restOfInput) -> ((result,result2), restOfInput))
+        p1 >> Option.bind runP
+//    let result = combineLBind (Parsers.pChar 'a') (Parsers.pChar 'b') "abcd";;
 //    e. Define 'orP p1 p2' which will atempt the first parser and if fail attempt second. or should fail if both p1 and p2 fails 
+    let orP p1 p2 input =
+        match p1 input with  //run the first parser ..
+        | Some _ as result -> result // ... and check the result
+        | None -> p2 input
+//    let result = orP (Parsers.pChar 'a') (Parsers.pChar 'b') "bbcd";;
+
 //    d. Define 'map p f' which will map the result of a praser with function f: Hint: Use Option.map
-
-
+    let map (p: Parser<'t>) f = 
+    //I don't understand how it works:
+        p >> Option.map( fun(result, restOfInput) -> (f result, restOfInput))
+    
 /// For clarity let's define set of infix operators for the methods defined above
 module Operators = 
     open Parsers
@@ -128,7 +147,6 @@ module Operators =
     let (.>>.) : Parser<'a> -> Parser<'b> -> Parser<'a*'b> = combine
     let (|>>) : Parser<'a> -> ('a -> 'b) -> Parser<'b> = map
     let (<|>) : Parser<'a> -> Parser<'a> -> Parser<'a> = orP
-
 
 // here is an example of operator usage = 
     let addParser : Parser<int> = pDigit .>> pChar '+' .>>. pDigit |>> fun (x,y) -> x + y
