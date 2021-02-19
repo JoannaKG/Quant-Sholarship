@@ -40,11 +40,13 @@ module Parsers =
     //Parsers.pAny "booBar";;
 
 //    b. Define function 'pDigit' that parse single digit from the input and return Parser<int>
-    let pDigit (input: seq<char>) =       
+    let pDigit (input: seq<char>) =    
+        let inline charToInt c = int c - int '0'
         if Seq.isEmpty input |> not && (List.contains (Seq.head input) ['0'..'9'])
-        then Some (Seq.head input, Seq.skip 1 input)             
+        //then Some ((Seq.head input) |> sprintf "%c" |> int, Seq.skip 1 input) 
+        then Some ((Seq.head input) |> charToInt, Seq.skip 1 input)             
         else None
-    //Parsers.pDigit "1fooBar";;
+    //Parsers.pDigit "0fooBar";;
 
 //    c. Define function 'pSpace' that eats all spaces from the begining of the input
     let pSpace (input: seq<char>) =       
@@ -53,12 +55,13 @@ module Parsers =
         else None
     //Parsers.pSpace "   foo Bar";;
 //    d. Define function 'pWord w' that tries to parse w at the begining of the input  
-//TODO
-    (*let pWord (w: seq<char>) (input: seq<char>) =       
-        if Seq.isEmpty input |> not && Seq.contains w input
-        then Some (w, Seq.skip 1 input)             
+    let pWord w (input: seq<char>) =    
+        let length = w |> Seq.length
+        let zipped = Seq.zip w input
+        if Seq.length zipped = length && zipped |> Seq.forall (fun (a,b) -> a=b)
+        then Some (w, Seq.skip length input)             
         else None
-    Parsers.pWord "f" "foo Bar";; *)
+    Parsers.pWord "foo" "foo Bar";; 
 
 // Till now we defined a few primitive parsers. Next step is to define higher order function that are able to combine them (combinators)
 // Here is example
@@ -75,7 +78,7 @@ module Combinators =
 
     // combineL combines two parsers and if both succeded returns result of the first one
     // here's usage example:
-    //    > let result: Parser<char> = combineL (Parsers.pChar 'a') (Parsers.pChar 'b');;
+    //    > let result: Parser<char> = Combinators.combineL (Parsers.pChar 'a') (Parsers.pChar 'b');;
     //    > result "bb";;
     //    val it : (char * seq<char>) option = None
     //    > result "abc";;
@@ -92,17 +95,16 @@ module Combinators =
             | Some (result, restOfInput2) -> Some (result, restOfInput2) // and if success return result of first parser
             | None -> None // second parser failed
         | _ -> None // first parser failed 
-    //    > let result: Parser<char> = combineR (Parsers.pChar 'a') (Parsers.pChar 'b');;
+    //    > let result: Parser<char> = Combinators.combineR (Parsers.pChar 'a') (Parsers.pChar 'b');;
     //    > result "bb";;
     //    val it : (char * seq<char>) option = None
     //    > result "abc";;
-    //    val it : (char * seq<char>) option = Some ('a', seq [])  // NOTE: value here is only 'a' but whole input was eaten by the combined parsers
+    //    val it : (char * seq<char>) option = Some ('b', seq [])  // NOTE: value here is only 'a' but whole input was eaten by the combined parsers
     //    > result "ac";;
     //    val it : (char * seq<char>) option = None
 
     //    b. Try to rewrite combineR using Option.bind. Hint: Did you use >> ? .
     let combineRBind (p1: Parser<'t1>) (p2: Parser<'t2>) =
-    //I don't understand how it works:
         p1 >> Option.bind (snd >> p2)
     //    let result: Parser<char> = combineRBind (Parsers.pChar 'a') (Parsers.pChar 'b');;
     //    result "abc";;
@@ -112,13 +114,12 @@ module Combinators =
         match p1 input with  //run the first parser ..
         | Some (result, restOfInput) -> // ... and check the result
             match p2 restOfInput with // if successed run the second parser
-            | Some (result2, _) -> Some((result, result2), restOfInput) 
+            | Some (result2, restOfInput2) -> Some((result, result2), restOfInput2) 
             | None -> None
         | _ -> None 
 //    let result = Combinators.combine (Parsers.pChar 'a') (Parsers.pChar 'b') "abcd";;
 
 //    d. Is it possible to rewrite comblineL and combine the same way combineR was in part b.?
-      //I don't understand how it works:
     let combineLBind (p1: Parser<'t1>) (p2: Parser<'t2>) =
         let runP (result, input) = p2 input |> Option.map(fun (_, restOfInput) -> (result, restOfInput))
         p1 >> Option.bind runP
@@ -135,7 +136,6 @@ module Combinators =
 
 //    d. Define 'map p f' which will map the result of a praser with function f: Hint: Use Option.map
     let map (p: Parser<'t>) f = 
-    //I don't understand how it works:
         p >> Option.map( fun(result, restOfInput) -> (f result, restOfInput))
     
 /// For clarity let's define set of infix operators for the methods defined above
@@ -153,7 +153,7 @@ module Operators =
 // First we parse for a digit followed by a '+' char. Since we use .>> (combineL) the result holds only the parsed digit.
 // Next we parse another digit and glue the result into tuple of ints with .>>. (combine combinator). 
 // Finally the int tuple is maped through sum function. Let's try to execute the parser:
-//        > addParser "1+9";;
+//        > Operators.addParser "1+9";;
 //        val it : (int * seq<char>) option = Some (10, seq [])   
 
 // Excercise 3.
@@ -168,7 +168,7 @@ module Operators =
 // Write parser that computes the result of arithmetic expression string.
 module Expressions = 
     open Parsers
-    open Combinators
+    open Operators
 
     // here is module with some helper parsers and functions
     [<AutoOpen>]
@@ -188,23 +188,47 @@ module Expressions =
     
     // to help you start of I prepare scaffoling for the solution: 
     let rec expression (input:seq<char>) : option<int * seq<char>>= 
-        let pExpression = (term .>> pPlus .>>. expression |>> sum ) // the case for summing term with an expression. It coresponds to < term > + < expression > part of the grammar 
-                          <|> // TODO: put a case for a term - expression it should correspond to < term > - < expression > 
-                          <|> // TODO: put a case for single term < term >
+        let pExpression = (term .>> pPlus .>>. expression |>> sum) // the case for summing term with an expression. It coresponds to < term > + < expression > part of the grammar 
+                          <|> (term .>> pMinus .>>. expression |>> minus)// TODO: put a case for a term - expression it should correspond to < term > - < expression > 
+                          <|> term // TODO: put a case for single term < term >
         input |> pExpression // here we trigger parsers on the input
 
     and term (input:seq<char>) : option<int * seq<char>> = 
-        let pTerm = // TODO: mutliplication 
-                    // TODO: or divide 
-                    // TODO: or factor 
+        let pTerm = (factor .>> pMult .>>. term |>> mul)// TODO: mutliplication 
+                    <|> (factor .>> pDiv .>>. term |>> div )// TODO: or divide 
+                    <|> factor // TODO: or factor 
         input |> pTerm
 
     and factor  (input:seq<char>) : option<int * seq<char>>  =  
-        let pFactor = // TODO: expression in parenthesis or a digit
+        let pFactor = (pOpen >>. expression .>> pClose) <|> pDigit// TODO: expression in parenthesis or a digit
         input |> pFactor
 
-// Excercise 4:Write some test for different expresions 
-// Excercise 5: The parser above is sensitive to whitespaces. "5 + 6" Won't parse. Extent the parse so it ignores whitespaces.
+    // Excercise 4:Write some test for different expresions 
+    let checkSum = Expressions.expression "6+5";;   //OK
+    let checkMinus = Expressions.expression "6-5";; //OK
+    let checkMult = Expressions.expression "6*5";;  //OK
+    let checkDiv = Expressions.expression "4/2";;   //OK
+    let checkDiv2 = Expressions.expression "(3+1)/2";;  //OK
+    let checkDiv2 = Expressions.expression "( 3 + 1 )/2";;  //OK
+    let checkSumMin = Expressions.expression "6+5-4";; //OK
+    let checkMulSum = Expressions.expression "5*(4+1)";; //OK
+    let checkMulMulDiv = Expressions.expression "(2*2)/4";; //OK
 
-// Excercise 6. There is a bug in the parser above. "5+7foobar" is valid expression. Write parser endInput : Parser<_> which success on empty input. Create safeExpression which combines 
-// expression and endInput so that "5+7foobar" is no longer valid input.
+    let checkMulMulDiv2 = Expressions.expression "2*2/2";; //WRONG!!!, it=0 because parser goes from right to left
+    let checkSum2 = Expressions.expression "60+5";;  //WRONG!!!, it = 6 because paser works for single char
+    let checkDiv = Expressions.expression "30/2";;  //WRONG!!!, it = 3
+
+    // Excercise 5: The parser above is sensitive to whitespaces. "5 + 6" Won't parse. Extent the parse so it ignores whitespaces.
+    let expressionWithoutWhitespaces : Parser<int> = Seq.filter (System.Char.IsWhiteSpace >> not) >> Expressions.expression 
+
+    let checkDiv2 = expressionWithoutWhitespaces "8 / 2";;
+    // Excercise 6. There is a bug in the parser above. "5+7foobar" is valid expression. Write parser endInput : Parser<_> which success on empty input. Create safeExpression which combines 
+    // expression and endInput so that "5+7foobar" is no longer valid input.
+    let safeExpression : Parser<_>= 
+        let endInput input =
+            if Seq.isEmpty input
+            then Some((), Seq.empty)
+            else None
+        Expressions.expression .>> endInput
+
+    let checkSave = safeExpression "5+7foobar";;
